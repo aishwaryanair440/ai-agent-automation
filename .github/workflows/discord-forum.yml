@@ -118,7 +118,7 @@ jobs:
               --arg author "$ISSUE_AUTHOR" \
               --arg assignees "$ASSIGNEES" \
               --arg labels "$LABELS" \
-              --arg body "$ISSUE_BODY" \
+              --arg body "Cannot show whole description!" \
               --arg updated_by "$ACTOR" \
               --argjson color "$EMBED_COLOR" \
               '{
