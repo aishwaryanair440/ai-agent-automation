@@ -3,6 +3,9 @@ const fs = require("fs");
 const path = require("path");
 const axios = require("axios");
 const { runLLM } = require("./llmAdapter");
+const { runGitHub } = require("../integrations/github");
+const { runSlack } = require("../integrations/slack");
+const { runDiscord } = require("../integrations/discord");
 require("dotenv").config();
 
 
@@ -543,6 +546,83 @@ ${rawOutput}
         success: true,
         timestamp: new Date(),
       };
+    }
+
+    // ----- GITHUB -----
+    if (step.type === "github") {
+      try {
+        const output = await runGitHub(step, context, interpolate);
+        return {
+          stepId: step.stepId || null,
+          type: "github",
+          tool: "github",
+          input: { action: step.action },
+          output,
+          success: true,
+          timestamp: new Date(),
+        };
+      } catch (err) {
+        return {
+          stepId: step.stepId || null,
+          type: "github",
+          tool: "github",
+          input: { action: step.action },
+          output: err.message,
+          success: false,
+          timestamp: new Date(),
+        };
+      }
+    }
+
+    // ----- SLACK -----
+    if (step.type === "slack") {
+      try {
+        const output = await runSlack(step, context, interpolate);
+        return {
+          stepId: step.stepId || null,
+          type: "slack",
+          tool: "slack",
+          input: { action: step.action },
+          output,
+          success: true,
+          timestamp: new Date(),
+        };
+      } catch (err) {
+        return {
+          stepId: step.stepId || null,
+          type: "slack",
+          tool: "slack",
+          input: { action: step.action },
+          output: err.message,
+          success: false,
+          timestamp: new Date(),
+        };
+      }
+    }
+    // ----- DISCORD -----
+    if (step.type === "discord") {
+      try {
+        const output = await runDiscord(step, context, interpolate);
+        return {
+          stepId: step.stepId || null,
+          type: "discord",
+          tool: "discord",
+          input: { action: step.action },
+          output,
+          success: true,
+          timestamp: new Date(),
+        };
+      } catch (err) {
+        return {
+          stepId: step.stepId || null,
+          type: "discord",
+          tool: "discord",
+          input: { action: step.action },
+          output: err.message,
+          success: false,
+          timestamp: new Date(),
+        };
+      }
     }
 
     // unknown step type
