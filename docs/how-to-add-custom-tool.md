@@ -190,9 +190,7 @@ const { runToolInSandbox } = require("./src/tools/registry");
 ```bash
 node test-mytool.js
 ```
-
-> You can also add your tool to a workflow via the UI dashboard and trigger it manually from there.
-
+git 
 ---
 
 ## 7. Checklist Before Raising a PR
