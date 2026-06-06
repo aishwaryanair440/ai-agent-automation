@@ -17,7 +17,20 @@ const StepResultSchema = new mongoose.Schema(
     input: { type: mongoose.Schema.Types.Mixed },
     output: { type: mongoose.Schema.Types.Mixed },
     success: { type: Boolean, default: true },
-    timestamp: { type: Date, default: Date.now }
+    timestamp: { type: Date, default: Date.now },
+    /**
+     * Wall-clock execution time of this step in milliseconds.
+     * Set by the runner after each executeStep() call.
+     */
+    durationMs: { type: Number },
+    /**
+     * Step-level telemetry payload.
+     * For "llm" steps with memory enabled:
+     *   { useMemory, retrievedMemoriesCount, similarityScores[], averageSimilarity }
+     * For "document_query" steps:
+     *   { topK, retrievedChunksCount, averageSimilarity, relevantChunksCount }
+     */
+    metrics: { type: mongoose.Schema.Types.Mixed }
   },
   { _id: false }
 );

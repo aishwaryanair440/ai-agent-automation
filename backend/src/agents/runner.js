@@ -181,11 +181,15 @@ async function runWorkerLoop() {
 
           visited.add(getStepId(currentStep));
 
+          // ⏱️ Measure individual step execution duration
+          const stepStart = Date.now();
           const result = await executeStep(currentStep, context, agent);
+          const stepDurationMs = Date.now() - stepStart;
 
-          // 🔥 attach debug info directly to result
+          // 🔥 attach debug info and telemetry directly to result
           result.name = currentStep.name;
           result.type = currentStep.type;
+          result.durationMs = stepDurationMs;
 
           await Task.findByIdAndUpdate(task._id, {
             $push: { stepResults: result },
