@@ -60,7 +60,6 @@ async function getGlobalWorkerSettings() {
 ------------------------- */
 let isRunningLoop = false;
 let activeThreadsCount = 0;
-let isPolling = false;
 
 async function executeSingleTask(task) {
   try {
@@ -299,50 +298,6 @@ async function executeSingleTask(task) {
   }
 }
 
-async function pollAndProcessQueue() {
-  const limit = Number(process.env.WORKER_CONCURRENCY_LIMIT || 5);
-
-  if (activeThreadsCount >= limit) {
-    return;
-  }
-
-  if (isPolling) {
-    return;
-  }
-  isPolling = true;
-
-  try {
-    const task = await claimNextTask({ workerId: WORKER_ID });
-    isPolling = false;
-
-    if (!task) {
-      if (activeThreadsCount === 0) {
-        const { pollIntervalMs } = await getGlobalWorkerSettings();
-        await sleep(pollIntervalMs);
-        setImmediate(pollAndProcessQueue);
-      }
-      return;
-    }
-
-    activeThreadsCount++;
-
-    executeSingleTask(task).finally(() => {
-      activeThreadsCount--;
-      setImmediate(pollAndProcessQueue);
-    });
-
-    if (activeThreadsCount < limit) {
-      setImmediate(pollAndProcessQueue);
-    }
-  } catch (err) {
-    isPolling = false;
-    console.error("❌ Worker poll error:", err);
-    const { pollIntervalMs } = await getGlobalWorkerSettings();
-    await sleep(pollIntervalMs);
-    setImmediate(pollAndProcessQueue);
-  }
-}
-
 async function runWorkerLoop() {
   if (isRunningLoop) return;
   isRunningLoop = true;
@@ -350,7 +305,37 @@ async function runWorkerLoop() {
   console.log("👷 Agent Runner Started… waiting for tasks");
   writeLog("Runner started", "info", { workerId: WORKER_ID });
 
-  pollAndProcessQueue();
+  while (true) {
+    try {
+      const limit = Number(process.env.WORKER_CONCURRENCY_LIMIT || 5);
+
+      if (activeThreadsCount >= limit) {
+        await sleep(500); // Back off and wait for a free slot
+        continue;
+      }
+
+      const task = await claimNextTask({ workerId: WORKER_ID });
+
+      if (!task) {
+        const { pollIntervalMs } = await getGlobalWorkerSettings();
+        await sleep(pollIntervalMs);
+        continue;
+      }
+
+      activeThreadsCount++;
+      executeSingleTask(task).finally(() => {
+        activeThreadsCount--;
+      });
+
+    } catch (error) {
+      console.error("❌ Worker loop error:", error);
+      writeLog(`Runner error: ${error.message}`, "error", {
+        workerId: WORKER_ID,
+      });
+      const { pollIntervalMs } = await getGlobalWorkerSettings();
+      await sleep(pollIntervalMs);
+    }
+  }
 }
 
 /* -------------------------
@@ -358,7 +343,12 @@ async function runWorkerLoop() {
 ------------------------- */
 async function start() {
   if (mongoose.connection.readyState === 0) {
-    await mongoose.connect(process.env.MONGO_URI);
+    const maxPoolSize = Number(process.env.MONGO_MAX_POOL_SIZE || 100);
+    const minPoolSize = Number(process.env.MONGO_MIN_POOL_SIZE || 10);
+    await mongoose.connect(process.env.MONGO_URI, {
+      maxPoolSize,
+      minPoolSize,
+    });
     console.log("📡 MongoDB connected for Agent Runner");
   }
   runWorkerLoop();

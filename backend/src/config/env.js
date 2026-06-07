@@ -37,6 +37,18 @@ const envSchema = z.object({
         message: "Invalid MONGO_URI",
       }
     ),
+  MONGO_MAX_POOL_SIZE: preprocessOptional(
+    z.coerce
+      .number()
+      .int()
+      .positive("MONGO_MAX_POOL_SIZE must be a positive number")
+  ),
+  MONGO_MIN_POOL_SIZE: preprocessOptional(
+    z.coerce
+      .number()
+      .int()
+      .positive("MONGO_MIN_POOL_SIZE must be a positive number")
+  ),
 
   // auth
   JWT_SECRET: z
