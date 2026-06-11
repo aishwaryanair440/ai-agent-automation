@@ -56,6 +56,8 @@ function getTypeColor(type: StepType) {
       return "bg-teal-500/20 text-teal-400 border-teal-500/30";
     case "Document":
       return "bg-orange-500/20 text-orange-400 border-orange-500/30";
+    case "Approval":
+      return "bg-amber-500/20 text-amber-500 border-amber-500/30";
     default:
       return "bg-muted text-muted-foreground";
   }
@@ -113,6 +115,8 @@ function summarizeStep(step: WorkflowStep) {
       }
       return "Tool execution step";
     }
+    case "Approval":
+      return step.approvalMessage ? `Pause: ${step.approvalMessage}` : "Pause for human approval";
     default:
       return "Unknown step";
   }
@@ -544,6 +548,16 @@ export default function WorkflowBuilderPage() {
               content: s.content ?? "",
             };
           }
+
+          if (s.type === "Approval") {
+            return {
+              stepId: s.id,
+              name: s.name,
+              position: s.position,
+              type: "approval",
+              approvalMessage: s.approvalMessage ?? "",
+            };
+          }
     // fallback (should never hit)
         return {
           stepId: s.id,
@@ -858,6 +872,7 @@ export default function WorkflowBuilderPage() {
                                 <SelectItem value="GitHub">GitHub</SelectItem>
                                 <SelectItem value="Slack">Slack</SelectItem>
                                 <SelectItem value="Discord">Discord</SelectItem>
+                                <SelectItem value="Approval">Approval Node (HITL)</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>
@@ -1234,6 +1249,27 @@ export default function WorkflowBuilderPage() {
                                     2,
                                   )}
                                 />
+                              </div>
+                            </>
+                          )}
+
+                          {step.type === "Approval" && (
+                            <>
+                              <div>
+                                <Label>Approval Message</Label>
+                                <Input
+                                  className="mt-1.5"
+                                  placeholder="e.g. Please review the drafted email before sending"
+                                  value={step.approvalMessage ?? ""}
+                                  onChange={(e) =>
+                                    updateStep(step.id, {
+                                      approvalMessage: e.target.value,
+                                    })
+                                  }
+                                />
+                                <p className="mt-1.5 text-xs text-muted-foreground">
+                                  Workflow execution will pause at this node until a human reviews and approves the pending task.
+                                </p>
                               </div>
                             </>
                           )}

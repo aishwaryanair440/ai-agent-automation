@@ -213,10 +213,81 @@ async function deleteTask(req, res) {
   }
 }
 
+// -----------------------------
+// Approve Task (HITL)
+// POST /api/tasks/:id/approve
+// -----------------------------
+async function approveTask(req, res) {
+  try {
+    const userId = req.user._id;
+    const taskId = req.params.id;
+    const { feedback } = req.body || {};
+
+    const t = await Task.findById(taskId);
+    if (!t) return sendError(res, 404, "not_found");
+    if (t.userId.toString() !== userId.toString())
+      return sendError(res, 403, "forbidden");
+    if (t.status !== "pending_approval")
+      return sendError(res, 400, "task_not_awaiting_approval");
+
+    await Task.findByIdAndUpdate(taskId, {
+      $set: {
+        status: "pending",
+        "approval.decision": "approved",
+        "approval.decidedAt": new Date(),
+        "approval.decidedBy": userId,
+        "approval.feedback": feedback || "",
+      },
+    });
+
+    return sendOK(res, { message: "approved" });
+  } catch (err) {
+    console.error("approveTask error:", err);
+    return sendError(res, 500, "server_error");
+  }
+}
+
+// -----------------------------
+// Reject Task (HITL)
+// POST /api/tasks/:id/reject
+// -----------------------------
+async function rejectTask(req, res) {
+  try {
+    const userId = req.user._id;
+    const taskId = req.params.id;
+    const { feedback } = req.body || {};
+
+    const t = await Task.findById(taskId);
+    if (!t) return sendError(res, 404, "not_found");
+    if (t.userId.toString() !== userId.toString())
+      return sendError(res, 403, "forbidden");
+    if (t.status !== "pending_approval")
+      return sendError(res, 400, "task_not_awaiting_approval");
+
+    await Task.findByIdAndUpdate(taskId, {
+      $set: {
+        status: "rejected",
+        completedAt: new Date(),
+        "approval.decision": "rejected",
+        "approval.decidedAt": new Date(),
+        "approval.decidedBy": userId,
+        "approval.feedback": feedback || "",
+      },
+    });
+
+    return sendOK(res, { message: "rejected" });
+  } catch (err) {
+    console.error("rejectTask error:", err);
+    return sendError(res, 500, "server_error");
+  }
+}
+
 module.exports = {
   createTask,
   listTasks,
   getTask,
   updateTask,
   deleteTask,
+  approveTask,
+  rejectTask,
 };

@@ -10,8 +10,8 @@ export type StepType =
   | "Condition"
   | "Switch"
   | "GitHub"
-  | "Slack"
-  | "Discord";
+  | "Discord"
+  | "Approval";
 
 export type ToolType = "email" | "file" | "browser";
 
@@ -85,6 +85,9 @@ export interface WorkflowNode {
     target: string;
   }[];
   defaultTarget?: string;
+
+  // Approval
+  approvalMessage?: string;
 }
 
 export interface BackendStep {
@@ -107,7 +110,8 @@ export interface BackendStep {
     | "browser"
     | "github"
     | "slack"
-    | "discord";
+    | "discord"
+    | "approval";
 
   position?: {
     x: number;
@@ -152,6 +156,7 @@ export interface BackendStep {
     target: string;
   }[];
   defaultTarget?: string;
+  approvalMessage?: string;
 }
 
 export interface WorkflowEdge {

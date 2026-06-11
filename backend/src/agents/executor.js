@@ -158,6 +158,24 @@ Do not say you lack memory.`;
       return result;
     }
 
+    // ----- APPROVAL (Human-In-The-Loop) -----
+    if (step.type === "approval" || step.type === "Approval") {
+      const message = step.message
+        ? interpolate(step.message, context)
+        : "Approval required before continuing";
+
+      return {
+        stepId: step.stepId || null,
+        type: "approval",
+        tool: "approval",
+        input: { message },
+        output: "Awaiting human approval",
+        success: true,
+        requiresApproval: true,
+        timestamp: new Date(),
+      };
+    }
+
     // Delay step
     if (step.type === "delay") {
       const sec = Number(

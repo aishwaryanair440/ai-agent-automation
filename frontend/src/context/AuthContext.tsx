@@ -40,26 +40,27 @@ function isTokenExpired(jwt: string) {
 export default function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
 
-  const [token, setToken] = useState<string | null>(() => {
-    if (typeof window === "undefined") return null;
-    const saved = localStorage.getItem("token");
-    return saved && !isTokenExpired(saved) ? saved : null;
-  });
+  const [token, setToken] = useState<string | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const [user, setUser] = useState<AuthUser | null>(() => {
-    if (typeof window === "undefined") return null;
+  useEffect(() => {
     const saved = localStorage.getItem("token");
-    if (!saved || isTokenExpired(saved)) return null;
-    const payload = decodeJwt(saved);
-    if (!payload) return null;
-    return {
-      id: payload.sub,
-      email: payload.email,
-      name: payload.name,
-    };
-  });
-
-  const [loading, setLoading] = useState(false);
+    if (saved && !isTokenExpired(saved)) {
+      setToken(saved);
+      const payload = decodeJwt(saved);
+      if (payload) {
+        setUser({
+          id: payload.sub,
+          email: payload.email,
+          name: payload.name,
+        });
+      }
+    } else if (saved) {
+      localStorage.removeItem("token");
+    }
+    setLoading(false);
+  }, []);
 
   const hydrateUser = useCallback((jwt: string) => {
     const payload = decodeJwt(jwt);

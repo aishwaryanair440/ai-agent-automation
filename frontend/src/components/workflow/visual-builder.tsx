@@ -51,6 +51,8 @@ function getNodeColor(type: string) {
       return "#16a34a"; // green
     case "Delay":
       return "#6b7280"; // gray
+    case "Approval":
+      return "#f97316"; // amber/orange
     default:
       return "#374151";
   }
@@ -80,6 +82,10 @@ function buildNodePreview(step: WorkflowNode | undefined, edges: WorkflowEdge[],
 
   if (step.type === "Delay") {
     rows.push({ name: "seconds", type: "number" });
+  }
+
+  if (step.type === "Approval") {
+    rows.push({ name: "message", type: "string" });
   }
 
   if (step.type === "Tool") {
@@ -828,6 +834,7 @@ export default function VisualBuilder({
                 <option value="GitHub">GitHub</option>
                 <option value="Slack">Slack</option>
                 <option value="Discord">Discord</option>
+                <option value="Approval">Approval</option>
               </select>
             </div>
 
@@ -1376,6 +1383,18 @@ export default function VisualBuilder({
                 <div className="text-xs text-muted-foreground">Connect edges to define cases.</div>
                 <div className="text-xs opacity-70">Each connection = one case value</div>
               </>
+            )}
+
+            {selectedStep.type === "Approval" && (
+              <div>
+                <label className="text-xs text-muted-foreground">Approval Message</label>
+                <textarea
+                  className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30 mt-1 bg-background"
+                  value={selectedStep.message || ""}
+                  onChange={(e) => updateStep(selectedStep.id, { message: e.target.value })}
+                  placeholder="e.g. Please approve this email before it is sent."
+                />
+              </div>
             )}
           </div>
         </div>

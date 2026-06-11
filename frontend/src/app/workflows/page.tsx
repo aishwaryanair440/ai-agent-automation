@@ -48,7 +48,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { motion } from "framer-motion";
-import { useAssistantContext } from "@/context/assistant-context";
 import { useToast } from "@/hooks/use-toast";
 import { apiUrl } from "@/lib/api";
 import { WorkflowPayload as Workflow, WorkflowAgent as Agent } from "@/types/workflow";
@@ -98,6 +97,7 @@ function getStatusColor(status: string) {
     case "running":
       return "bg-success/20 text-success border-success/30";
     case "idle":
+    case "pending":
       return "bg-muted text-muted-foreground border-border";
     case "failed":
       return "bg-destructive/20 text-destructive border-destructive/30";
@@ -146,6 +146,7 @@ const WorkflowCard = memo(
     const [editName, setEditName] = useState(workflow.name);
     const [isSaving, setIsSaving] = useState(false);
     const { addToast } = useToast();
+    const router = useRouter();
 
     const handleSave = async () => {
       if (editName.trim() === "") {
@@ -191,9 +192,14 @@ const WorkflowCard = memo(
         transition={{ duration: 0.24, ease: "easeOut" }}
         className="group"
       >
-        <Card className="p-6">
+        <Card 
+          className="p-6 cursor-pointer hover:border-primary/50 transition-all"
+          onClick={() => {
+            if (!isEditing) router.push(`/workflows/${workflow._id}`);
+          }}
+        >
           <div className="flex items-start justify-between">
-            <div className="flex-1">
+            <div className="flex-1" onClick={(e) => e.stopPropagation()}>
               {isEditing ? (
                 <div className="flex items-center gap-2">
                   <input
@@ -235,11 +241,13 @@ const WorkflowCard = memo(
                   <Link
                     href={`/workflows/${workflow._id}`}
                     className="text-lg font-semibold hover:text-primary"
+                    onClick={(e) => e.stopPropagation()}
                   >
                     {workflow.name}
                   </Link>
                   <button
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation();
                       setIsEditing(true);
                       setEditName(workflow.name);
                     }}
@@ -259,7 +267,12 @@ const WorkflowCard = memo(
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-8 w-8"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <MoreVertical className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
@@ -293,10 +306,13 @@ const WorkflowCard = memo(
           </div>
 
           <div className="mt-4 flex flex-wrap items-center gap-2 overflow-hidden opacity-0 max-h-0 transition-all duration-200 group-hover:opacity-100 group-hover:max-h-24">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => onEdit(workflow)}
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit(workflow);
+              }}
             >
               Edit details
             </Button>
@@ -316,7 +332,7 @@ const WorkflowCard = memo(
 
           <div className="mt-4 flex items-center justify-between">
             <Badge className={getStatusColor(workflow.status)}>
-              {workflow.status}
+              {workflow.status === "pending" ? "idle" : workflow.status}
             </Badge>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Bot className="size-4" />
@@ -336,6 +352,7 @@ const WorkflowCard = memo(
                   className="h-7 gap-1.5 text-xs"
                   onClick={(e) => {
                     e.preventDefault();
+                    e.stopPropagation();
                     onCopy(workflow._id);
                   }}
                 >
@@ -614,65 +631,24 @@ export default function WorkflowsPage() {
                  </Card>
                 ))}
               </div>
-            ) : (
-              <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-                {workflows.map((workflow) => (
-                  <Card key={workflow._id} className="p-6">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <Link
-                          href={`/workflows/${workflow._id}`}
-                          className="text-lg font-semibold hover:text-primary"
-                        >
-                          {workflow.name}
-                        </Link>
-
-                        {workflow.description && (
-                          <p className="mt-2 text-sm text-muted-foreground">
-                            {workflow.description}
-                          </p>
-                        )}
-                      </div>
-
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                          >
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-
-                        <DropdownMenuContent align="end">
-                          <Link href={`/workflows/${workflow._id}/builder`}>
-                            <DropdownMenuItem
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                setEditingWorkflow(workflow);
-                              }}
-                            >
-                              Edit Workflow Details
-                            </DropdownMenuItem>
-                          </Link>
-                          <DropdownMenuItem
-                            className="text-destructive"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              handleDeleteWorkflow(workflow._id);
-                            }}
-                          >
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </EmptyContent>
-                </Empty>
-              </div>
+            ) : workflows.length === 0 ? (
+              <Empty>
+                <EmptyHeader>
+                  <EmptyMedia>
+                    <GitFork className="size-10 text-muted-foreground" />
+                  </EmptyMedia>
+                  <EmptyTitle>No workflows yet</EmptyTitle>
+                  <EmptyDescription>
+                    Create your first workflow to get started with AI automation.
+                  </EmptyDescription>
+                </EmptyHeader>
+                <EmptyContent>
+                  <Button onClick={() => setOpen("blank")}>
+                    <Plus className="mr-2 size-4" />
+                    Create Workflow
+                  </Button>
+                </EmptyContent>
+              </Empty>
             ) : (
               // Workflows exist! Show the new Toolbar and Grid
               <div className="space-y-6">

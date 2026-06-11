@@ -145,6 +145,25 @@ async function executeSingleTask(task) {
       let stepCount = 0;
       const MAX_STEPS = 50;
 
+      // ── HITL RESUME: If task was previously paused at an approval node,
+      // skip steps that were already executed and rebuild context.
+      const alreadyExecutedStepIds = new Set(
+        (task.stepResults || []).map((r) => r.stepId)
+      );
+      const isResuming = !!task.pausedAtStepId;
+
+      if (isResuming) {
+        console.log(`🔄 Resuming task ${task._id} from approval at step ${task.pausedAtStepId}`);
+        // Rebuild context.results from stored stepResults
+        for (const prevResult of (task.stepResults || [])) {
+          context.results.push(prevResult);
+          context.last = {
+            input: prevResult.input,
+            output: prevResult.output,
+          };
+        }
+      }
+
       while (currentStep && stepCount < MAX_STEPS) {
         stepCount++;
         if (stepCount >= MAX_STEPS) {
@@ -153,6 +172,27 @@ async function executeSingleTask(task) {
         }
 
         visited.add(getStepId(currentStep));
+
+        // ── HITL RESUME: Skip steps already executed before approval pause ──
+        if (isResuming && alreadyExecutedStepIds.has(getStepId(currentStep))) {
+          // Find next step (same logic as end of loop) and skip
+          let nextEdge = null;
+          if (currentStep.type === "condition") {
+            const prevResult = (task.stepResults || []).find(r => r.stepId === getStepId(currentStep));
+            nextEdge = edges.find(e => e.source === getStepId(currentStep) && e.condition === prevResult?.branch);
+          } else if (currentStep.type === "switch") {
+            const prevResult = (task.stepResults || []).find(r => r.stepId === getStepId(currentStep));
+            const normalize = (v) => String(v || "").toLowerCase().trim();
+            const value = normalize(prevResult?.caseValue);
+            nextEdge = edges.find(e => e.source === getStepId(currentStep) && normalize(e.caseValue) && value.includes(normalize(e.caseValue)));
+            if (!nextEdge) nextEdge = edges.find(e => e.source === getStepId(currentStep) && !e.caseValue);
+          } else {
+            nextEdge = edges.find(e => e.source === getStepId(currentStep));
+          }
+          if (!nextEdge) break;
+          currentStep = stepsMap[nextEdge.target];
+          continue;
+        }
 
         // ⏱️ Measure individual step execution duration
         const stepStart = Date.now();
@@ -177,6 +217,27 @@ async function executeSingleTask(task) {
         if (!result.success) {
           success = false;
           break;
+        }
+
+        // ── HITL: Pause execution if this step requires human approval ──
+        if (result.requiresApproval) {
+          await Task.findByIdAndUpdate(task._id, {
+            $set: {
+              status: "pending_approval",
+              pausedAtStepId: getStepId(currentStep),
+              approval: {
+                stepId: getStepId(currentStep),
+                requestedAt: new Date(),
+              },
+            },
+          });
+          console.log(`⏸️ Task ${task._id} paused for approval at step ${getStepId(currentStep)}`);
+          writeLog("Task paused for approval", "info", {
+            workerId: WORKER_ID,
+            taskId: task._id,
+            stepId: getStepId(currentStep),
+          });
+          return; // exit without calling completeTask
         }
 
         // 🔥 FIND NEXT STEP USING EDGES

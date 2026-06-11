@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import AuthProvider from "@/context/AuthContext";
-import { ThemeProvider, useTheme } from "next-themes";
+import { useTheme } from "next-themes";
 import { PageTransition } from "@/components/page-transition";
 import { ToastProvider } from "@/hooks/use-toast";
 import { Toaster } from "@/components/ui/toaster";
@@ -73,9 +73,7 @@ export default function ClientLayout({
       <SettingsProvider>
         <AssistantProvider>
           <ToastProvider>
-            <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-              <InnerLayout>{children}</InnerLayout>
-            </ThemeProvider>
+            <InnerLayout>{children}</InnerLayout>
           </ToastProvider>
         </AssistantProvider>
       </SettingsProvider>

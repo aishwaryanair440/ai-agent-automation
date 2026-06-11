@@ -492,48 +492,60 @@ export default function WorkflowDetailPage() {
           <Card className="p-8">
             <h2 className="mb-6 text-xl font-semibold">Workflow Pipeline</h2>
             <div className="space-y-4">
-              {workflow.metadata?.steps?.map(
-                (step: WorkflowStep, index: number) => {
-                  const status = getStepStatus(step.stepId);
+              {(!workflow.metadata?.steps || workflow.metadata.steps.length === 0) ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground border-2 border-dashed border-border rounded-lg">
+                  <p className="mb-4">No steps configured for this workflow yet.</p>
+                  <Link href={`/workflows/${workflow._id}/builder`}>
+                    <Button variant="outline">
+                      <Settings className="mr-2 size-4" />
+                      Configure Pipeline
+                    </Button>
+                  </Link>
+                </div>
+              ) : (
+                workflow.metadata.steps.map(
+                  (step: WorkflowStep, index: number) => {
+                    const status = getStepStatus(step.stepId);
 
-                  return (
-                    <div key={step.stepId}>
-                      <Card
-                        className={`p-6 cursor-pointer ${getStepColor(status)}`}
-                        onClick={() => handleStepSelect(step)}
-                      >
-                        <div className="flex items-start gap-4">
-                          {getStepIcon(status)}
+                    return (
+                      <div key={step.stepId}>
+                        <Card
+                          className={`p-6 cursor-pointer ${getStepColor(status)}`}
+                          onClick={() => handleStepSelect(step)}
+                        >
+                          <div className="flex items-start gap-4">
+                            {getStepIcon(status)}
 
-                          <div className="flex-1">
-                            <div className="mb-2 flex items-center gap-3">
-                              <Badge
-                                variant="outline"
-                                className={getTypeColor(
-                                  normalizeStepType(step.type),
-                                )}
-                              >
-                                {normalizeStepType(step.type)}
-                              </Badge>
+                            <div className="flex-1">
+                              <div className="mb-2 flex items-center gap-3">
+                                <Badge
+                                  variant="outline"
+                                  className={getTypeColor(
+                                    normalizeStepType(step.type),
+                                  )}
+                                >
+                                  {normalizeStepType(step.type)}
+                                </Badge>
 
-                              <h3 className="font-semibold">{step.name}</h3>
+                                <h3 className="font-semibold">{step.name}</h3>
+                              </div>
+
+                              <p className="text-sm text-muted-foreground line-clamp-3">
+                                {getStepDescription(step)}
+                              </p>
                             </div>
-
-                            <p className="text-sm text-muted-foreground line-clamp-3">
-                              {getStepDescription(step)}
-                            </p>
                           </div>
-                        </div>
-                      </Card>
+                        </Card>
 
-                      {index < (workflow.metadata?.steps?.length ?? 0) - 1 && (
-                        <div className="flex justify-center py-2">
-                          <ArrowRight className="size-5 text-muted-foreground" />
-                        </div>
-                      )}
-                    </div>
-                  );
-                },
+                        {index < (workflow.metadata?.steps?.length ?? 0) - 1 && (
+                          <div className="flex justify-center py-2">
+                            <ArrowRight className="size-5 text-muted-foreground" />
+                          </div>
+                        )}
+                      </div>
+                    );
+                  },
+                )
               )}
             </div>
           </Card>
