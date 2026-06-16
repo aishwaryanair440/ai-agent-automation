@@ -12,6 +12,31 @@ const { runLLM } = require("../agents/llmAdapter");
 const upload = multer({ storage: multer.memoryStorage() });
 const MAX_SELECTED_DOCUMENTS = 10;
 const MAX_RAG_CONTEXT_CHARS = 12000;
+const DOCUMENT_PROCESSING_TIMEOUT_MS = 2 * 60 * 1000;
+
+function safeProcessingError(error) {
+  if (!error) return "Document processing failed";
+
+  const message = error instanceof Error
+    ? error.message
+    : String(error);
+
+  return message.slice(0, 500) || "Document processing failed";
+}
+
+function withTimeout(promise, timeoutMs) {
+  let timeoutId;
+
+  const timeoutPromise = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => {
+      reject(new Error("Document processing timed out"));
+    }, timeoutMs);
+  });
+
+  return Promise.race([promise, timeoutPromise]).finally(() => {
+    clearTimeout(timeoutId);
+  });
+}
 
 /* -----------------------------
    Upload Document
@@ -86,7 +111,13 @@ async function uploadDocument(req, res) {
       userId: req.user._id,
       title: file.originalname,
       fileType: extension,
-      size: file.size
+      size: file.size,
+      status: "processing",
+      processingStartedAt: new Date(),
+      processingStep: "Queued",
+      processedChunks: 0,
+      totalChunks: 0,
+      processingError: undefined
     });
 
     /* ---------- Process document (chunk + embed) ---------- */
@@ -104,7 +135,25 @@ async function uploadDocument(req, res) {
 
     const agent = { config: { provider } };
 
-    await processDocument(agent, document, text);
+    try {
+      await Document.findByIdAndUpdate(document._id, {
+        processingStep: "Extracting text"
+      });
+
+      await withTimeout(
+        processDocument(agent, document, text),
+        DOCUMENT_PROCESSING_TIMEOUT_MS
+      );
+    } catch (processingError) {
+      await Document.findByIdAndUpdate(document._id, {
+        status: "failed",
+        processingStep: "Failed",
+        processingError: safeProcessingError(processingError),
+        processedAt: new Date()
+      });
+
+      throw processingError;
+    }
 
     res.json({
       ok: true,
@@ -200,6 +249,15 @@ async function chatWithDocument(req, res) {
       return res.status(404).json({
         ok: false,
         error: "Document not found"
+      });
+    }
+
+    const hasFailedDocument = documents.some((document) => document.status === "failed");
+
+    if (hasFailedDocument) {
+      return res.status(400).json({
+        ok: false,
+        error: "document_processing_failed"
       });
     }
 

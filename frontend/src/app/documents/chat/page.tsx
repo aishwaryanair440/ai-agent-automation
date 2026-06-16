@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import ReactMarkdown from "react-markdown";
@@ -25,6 +25,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 import {
   Empty,
   EmptyContent,
@@ -45,6 +46,12 @@ type DocumentMeta = {
   chunkCount?: number;
   size?: number;
   status?: string;
+  processingStep?: string;
+  processedChunks?: number;
+  totalChunks?: number;
+  processingStartedAt?: string;
+  processedAt?: string;
+  processingError?: string;
 };
 
 type RagSource = {
@@ -89,7 +96,11 @@ function formatScore(score?: number) {
 }
 
 function formatSourceMeta(document: DocumentMeta) {
-  const status = document.status === "ready" ? "Ready" : "Processing";
+  const status = document.status === "failed"
+    ? "Failed"
+    : document.status === "ready"
+      ? "Ready"
+      : "Processing";
   const type = document.fileType?.toUpperCase();
   const size = formatSize(document.size);
 
@@ -106,6 +117,33 @@ function formatSourceMeta(document: DocumentMeta) {
       ];
 
   return details.filter(Boolean).join(" · ");
+}
+
+function getDocumentProgress(document: DocumentMeta) {
+  if (document.status === "ready") return 100;
+
+  const processedChunks = document.processedChunks || 0;
+  const totalChunks = document.totalChunks || 0;
+
+  if (totalChunks > 0) {
+    return Math.round((processedChunks / totalChunks) * 100);
+  }
+
+  return document.status === "processing" ? 10 : 0;
+}
+
+function getProcessingLabel(document: DocumentMeta) {
+  if (document.status === "failed") return "Failed";
+
+  const step = document.processingStep || "Processing";
+  const processedChunks = document.processedChunks || 0;
+  const totalChunks = document.totalChunks || 0;
+
+  if (document.status === "processing" && totalChunks > 0) {
+    return `${step} · ${processedChunks}/${totalChunks}`;
+  }
+
+  return document.status === "processing" ? "Processing..." : step;
 }
 
 function MultiDocumentChatContent() {
@@ -146,49 +184,65 @@ function MultiDocumentChatContent() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, chatLoading]);
 
-  useEffect(() => {
-    async function loadDocuments() {
-      if (!selectedDocumentIds.length) {
-        setDocuments([]);
-        setMissingDocumentIds([]);
-        return;
+  const loadDocuments = useCallback(async (showLoader = true) => {
+    if (!selectedDocumentIds.length) {
+      setDocuments([]);
+      setMissingDocumentIds([]);
+      return;
+    }
+
+    try {
+      if (showLoader) {
+        setMetadataLoading(true);
+      }
+      setMetadataError("");
+
+      const res = await fetch(apiUrl("/documents"), {
+        headers: {
+          Authorization: "Bearer " + localStorage.getItem("token")
+        }
+      });
+
+      const data = await res.json();
+
+      if (!data.ok) {
+        throw new Error(data.error || "Failed to load documents");
       }
 
-      try {
-        setMetadataLoading(true);
-        setMetadataError("");
+      const allDocuments = (data.documents || []) as DocumentMeta[];
+      const byId = new Map(allDocuments.map((document) => [document._id, document]));
+      const selectedDocuments = selectedDocumentIds
+        .map((id) => byId.get(id))
+        .filter(Boolean) as DocumentMeta[];
 
-        const res = await fetch(apiUrl("/documents"), {
-          headers: {
-            Authorization: "Bearer " + localStorage.getItem("token")
-          }
-        });
-
-        const data = await res.json();
-
-        if (!data.ok) {
-          throw new Error(data.error || "Failed to load documents");
-        }
-
-        const allDocuments = (data.documents || []) as DocumentMeta[];
-        const byId = new Map(allDocuments.map((document) => [document._id, document]));
-        const selectedDocuments = selectedDocumentIds
-          .map((id) => byId.get(id))
-          .filter(Boolean) as DocumentMeta[];
-
-        setDocuments(selectedDocuments);
-        setMissingDocumentIds(
-          selectedDocumentIds.filter((id) => !byId.has(id))
-        );
-      } catch {
-        setMetadataError("Could not load selected document details. Make sure the backend server is running.");
-      } finally {
+      setDocuments(selectedDocuments);
+      setMissingDocumentIds(
+        selectedDocumentIds.filter((id) => !byId.has(id))
+      );
+    } catch {
+      setMetadataError("Could not load selected document details. Make sure the backend server is running.");
+    } finally {
+      if (showLoader) {
         setMetadataLoading(false);
       }
     }
+  }, [selectedDocumentIds]);
 
+  useEffect(() => {
     loadDocuments();
-  }, [selectedDocumentIdKey, selectedDocumentIds]);
+  }, [loadDocuments]);
+
+  useEffect(() => {
+    const hasProcessingDocuments = documents.some((document) => document.status === "processing");
+
+    if (!hasProcessingDocuments) return;
+
+    const intervalId = window.setInterval(() => {
+      loadDocuments(false);
+    }, 4000);
+
+    return () => window.clearInterval(intervalId);
+  }, [documents, loadDocuments]);
 
   async function submitQuestion(questionOverride?: string) {
     const question = (questionOverride || input).trim();
@@ -375,30 +429,59 @@ function MultiDocumentChatContent() {
                         </div>
                       )}
 
-                      {documents.map((document) => (
-                        <Link
-                          key={document._id}
-                          href={`/documents/${document._id}`}
-                          className="block rounded-xl border border-border/70 bg-background/70 p-4 shadow-sm transition-colors hover:border-primary/35 hover:bg-background"
-                        >
-                          <div className="flex items-start gap-3.5">
-                            <div className="mt-0.5 rounded-md bg-muted/80 p-1.5">
-                              <FileText className="size-3.5 text-muted-foreground" />
-                            </div>
-                            <div className="min-w-0 flex-1 space-y-1.5">
-                              <div className="flex items-start justify-between gap-2">
-                                <p className="min-w-0 truncate text-[15px] font-medium leading-snug">
-                                  {document.title || "Untitled"}
-                                </p>
-                                <ExternalLink className="mt-1 size-3 shrink-0 text-muted-foreground/70" />
+                      {documents.map((document) => {
+                        const isProcessing = document.status === "processing";
+                        const isFailed = document.status === "failed";
+                        const progress = getDocumentProgress(document);
+
+                        return (
+                          <Link
+                            key={document._id}
+                            href={`/documents/${document._id}`}
+                            className="block rounded-xl border border-border/70 bg-background/70 p-4 shadow-sm transition-colors hover:border-primary/35 hover:bg-background"
+                          >
+                            <div className="flex items-start gap-3.5">
+                              <div className="mt-0.5 rounded-md bg-muted/80 p-1.5">
+                                <FileText className="size-3.5 text-muted-foreground" />
                               </div>
-                              <p className="truncate text-xs text-muted-foreground">
-                                {formatSourceMeta(document)}
-                              </p>
+                              <div className="min-w-0 flex-1 space-y-2">
+                                <div className="flex items-start justify-between gap-2">
+                                  <p className="min-w-0 truncate text-[15px] font-medium leading-snug">
+                                    {document.title || "Untitled"}
+                                  </p>
+                                  <ExternalLink className="mt-1 size-3 shrink-0 text-muted-foreground/70" />
+                                </div>
+                                <p className="truncate text-xs text-muted-foreground">
+                                  {formatSourceMeta(document)}
+                                </p>
+                                {(isProcessing || isFailed) && (
+                                  <div className="space-y-1.5">
+                                    <div className="flex items-center justify-between gap-2 text-xs">
+                                      <span className={isFailed ? "text-destructive" : "text-muted-foreground"}>
+                                        {getProcessingLabel(document)}
+                                      </span>
+                                      {!isFailed && (
+                                        <span className="font-mono text-muted-foreground">
+                                          {progress}%
+                                        </span>
+                                      )}
+                                    </div>
+                                    <Progress
+                                      value={progress}
+                                      className={`h-1 ${isFailed ? "[&>div]:bg-destructive" : ""}`}
+                                    />
+                                    {isFailed && document.processingError && (
+                                      <p className="line-clamp-2 text-xs text-muted-foreground">
+                                        {document.processingError}
+                                      </p>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        </Link>
-                      ))}
+                          </Link>
+                        );
+                      })}
                     </div>
                   </ScrollArea>
                 </Card>

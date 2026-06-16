@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { AppSidebar } from "@/components/app-sidebar";
 import { AuthGuard } from "@/components/auth/auth-guard";
 import { Card } from "@/components/ui/card";
@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Progress } from "@/components/ui/progress";
 import {
   Empty,
   EmptyHeader,
@@ -39,7 +40,54 @@ type Document = {
   chunkCount: number;
   size?: number;
   createdAt: string;
+  status?: string;
+  processingStep?: string;
+  processedChunks?: number;
+  totalChunks?: number;
+  processingStartedAt?: string;
+  processedAt?: string;
+  processingError?: string;
 };
+
+function getDocumentProgress(document: Document) {
+  if (document.status === "ready") return 100;
+
+  if (document.status === "processing") {
+    const processedChunks = document.processedChunks || 0;
+    const totalChunks = document.totalChunks || 0;
+
+    if (totalChunks > 0) {
+      return Math.min(99, Math.round((processedChunks / totalChunks) * 100));
+    }
+
+    return 10;
+  }
+
+  if (document.status === "failed") {
+    const processedChunks = document.processedChunks || 0;
+    const totalChunks = document.totalChunks || 0;
+
+    if (totalChunks > 0) {
+      return Math.round((processedChunks / totalChunks) * 100);
+    }
+  }
+
+  return 0;
+}
+
+function getProcessingLabel(document: Document) {
+  if (document.status === "failed") return "Failed";
+
+  const step = document.processingStep || "Processing";
+  const processedChunks = document.processedChunks || 0;
+  const totalChunks = document.totalChunks || 0;
+
+  if (document.status === "processing" && totalChunks > 0) {
+    return `${step} · ${processedChunks}/${totalChunks}`;
+  }
+
+  return document.status === "processing" ? "Processing..." : step;
+}
 
 export default function DocumentsPage() {
   const [documents, setDocuments] = useState<Document[]>([]);
@@ -54,9 +102,11 @@ export default function DocumentsPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const { addToast } = useToast();
 
-  async function fetchDocuments() {
+  const fetchDocuments = useCallback(async (showLoader = true) => {
     try {
-      setDocumentsLoading(true);
+      if (showLoader) {
+        setDocumentsLoading(true);
+      }
       setDocumentsError("");
 
       const res = await fetch(apiUrl("/documents"), {
@@ -75,13 +125,27 @@ export default function DocumentsPage() {
     } catch {
       setDocumentsError("Could not load documents. Make sure the backend server is running.");
     } finally {
-      setDocumentsLoading(false);
+      if (showLoader) {
+        setDocumentsLoading(false);
+      }
     }
-  }
+  }, []);
 
   useEffect(() => {
     fetchDocuments();
-  }, []);
+  }, [fetchDocuments]);
+
+  useEffect(() => {
+    const hasProcessingDocuments = documents.some((document) => document.status === "processing");
+
+    if (!hasProcessingDocuments) return;
+
+    const intervalId = window.setInterval(() => {
+      fetchDocuments(false);
+    }, 4000);
+
+    return () => window.clearInterval(intervalId);
+  }, [documents, fetchDocuments]);
 
   useEffect(() => {
     setContext({
@@ -96,7 +160,7 @@ export default function DocumentsPage() {
     });
 
     return () => clearContext();
-  }, [documents]);
+  }, [clearContext, documents, setContext]);
 
   async function uploadFile(file: File) {
     try {
@@ -119,7 +183,7 @@ export default function DocumentsPage() {
           type: "success",
           title: "Document uploaded",
         });
-        fetchDocuments();
+        fetchDocuments(false);
       }
     } catch {
       addToast({
@@ -260,7 +324,7 @@ export default function DocumentsPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={fetchDocuments}
+                  onClick={() => fetchDocuments()}
                   className="mt-3"
                 >
                   Retry
@@ -349,6 +413,9 @@ export default function DocumentsPage() {
                 <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
                   {filteredDocs.map((doc) => {
                     const isSelected = selectedDocumentIds.includes(doc._id);
+                    const isProcessing = doc.status === "processing";
+                    const isFailed = doc.status === "failed";
+                    const progress = getDocumentProgress(doc);
 
                     return (
                       <Card
@@ -406,6 +473,15 @@ export default function DocumentsPage() {
                             </div>
 
                             <div className="flex flex-wrap items-center gap-2 mt-2">
+                              {doc.status && (
+                                <Badge
+                                  variant={isFailed ? "destructive" : "secondary"}
+                                  className="text-xs"
+                                >
+                                  {isFailed ? "Failed" : doc.status}
+                                </Badge>
+                              )}
+
                               <Badge variant="secondary" className="text-xs">
                                 {doc.fileType}
                               </Badge>
@@ -420,6 +496,30 @@ export default function DocumentsPage() {
                                 </Badge>
                               )}
                             </div>
+
+                            {(isProcessing || isFailed) && (
+                              <div className="mt-4 space-y-2">
+                                <div className="flex items-center justify-between gap-3 text-xs">
+                                  <span className={isFailed ? "text-destructive" : "text-muted-foreground"}>
+                                    {getProcessingLabel(doc)}
+                                  </span>
+                                  {!isFailed && (
+                                    <span className="font-mono text-muted-foreground">
+                                      {progress}%
+                                    </span>
+                                  )}
+                                </div>
+                                <Progress
+                                  value={progress}
+                                  className={`h-1.5 ${isFailed ? "[&>div]:bg-destructive" : ""}`}
+                                />
+                                {isFailed && doc.processingError && (
+                                  <p className="line-clamp-2 text-xs text-muted-foreground">
+                                    {doc.processingError}
+                                  </p>
+                                )}
+                              </div>
+                            )}
                           </div>
                         </div>
 
