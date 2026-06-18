@@ -467,6 +467,34 @@ async function runWorkflowPartial(req, res) {
       return res.status(404).json({ ok: false, error: 'parent_task_not_found' });
     }
 
+    if (parentTask.userId.toString() !== req.user._id.toString()) {
+      return res
+        .status(403)
+        .json({ ok: false, error: 'forbidden', message: 'Parent task ownership mismatch' });
+    }
+
+    if (!parentTask.workflowId || parentTask.workflowId.toString() !== workflowId.toString()) {
+      return res
+        .status(400)
+        .json({
+          ok: false,
+          error: 'workflow_mismatch',
+          message: 'Parent task belongs to a different workflow',
+        });
+    }
+
+    const validStatuses = ['completed', 'failed', 'pending_approval', 'rejected'];
+    const hasValidHistory =
+      Array.isArray(parentTask.stepResults) && parentTask.stepResults.length > 0;
+    if (!validStatuses.includes(parentTask.status) && !hasValidHistory) {
+      return res.status(400).json({
+        ok: false,
+        error: 'invalid_baseline_task',
+        message:
+          'Replay baseline task must be completed, failed, pending approval, or have a valid execution trace history.',
+      });
+    }
+
     const { steps, edges } = getWorkflowGraph(workflow);
 
     if (steps.length === 0) {
@@ -475,12 +503,10 @@ async function runWorkflowPartial(req, res) {
 
     const startNodeExists = steps.some((s) => (s.stepId || s.id || s.name) === startNodeId);
     if (!startNodeExists) {
-      return res
-        .status(400)
-        .json({
-          ok: false,
-          error: `startNodeId '${startNodeId}' not found in current workflow steps`,
-        });
+      return res.status(400).json({
+        ok: false,
+        error: `startNodeId '${startNodeId}' not found in current workflow steps`,
+      });
     }
 
     // Compute current workflow hash to check for changes

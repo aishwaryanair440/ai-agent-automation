@@ -123,4 +123,36 @@ describe('Partial Execution Replay', () => {
     expect(res.body.ok).toBe(false);
     expect(res.body.error).toContain('not found');
   });
+
+  it("should fail if replay is attempted against another user's task", async () => {
+    mockParentTask.userId = new mongoose.Types.ObjectId(); // different userId
+
+    await runWorkflowPartial(req, res);
+
+    expect(res.statusCode).toBe(403);
+    expect(res.body.ok).toBe(false);
+    expect(res.body.error).toBe('forbidden');
+    expect(res.body.message).toContain('ownership mismatch');
+  });
+
+  it('should fail if replay is attempted against a task from a different workflow', async () => {
+    mockParentTask.workflowId = new mongoose.Types.ObjectId(); // different workflowId
+
+    await runWorkflowPartial(req, res);
+
+    expect(res.statusCode).toBe(400);
+    expect(res.body.ok).toBe(false);
+    expect(res.body.error).toBe('workflow_mismatch');
+  });
+
+  it('should fail if replay is attempted against an invalid baseline task with no execution history', async () => {
+    mockParentTask.status = 'pending';
+    mockParentTask.stepResults = []; // empty history
+
+    await runWorkflowPartial(req, res);
+
+    expect(res.statusCode).toBe(400);
+    expect(res.body.ok).toBe(false);
+    expect(res.body.error).toBe('invalid_baseline_task');
+  });
 });
