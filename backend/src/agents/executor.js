@@ -20,8 +20,9 @@ async function executeStep(step, context = {}, agent = null) {
   const explicitTimeout = Number(step.timeoutMs ?? step.timeout);
   const finalTimeoutMs = !isNaN(explicitTimeout) && explicitTimeout > 0 ? explicitTimeout : 30000;
 
-  const maxRetries = Math.max(0, Number(step.maxRetries) || 0);
-  const backoffMultiplier = Math.max(1, Number(step.backoffMultiplier) || 1);
+  const stepConfig = step.config || step; 
+  const maxRetries = Math.max(0, Number(stepConfig.maxRetries) || 0);
+  const backoffMultiplier = Math.max(1, Number(stepConfig.backoffMultiplier) || 1);
   let currentBackoffMs = 1000; 
 
   let lastResult = null;
