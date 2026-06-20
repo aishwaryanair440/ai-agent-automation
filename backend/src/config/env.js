@@ -188,7 +188,7 @@ function validateEnv() {
     console.error("\n❌ Environment Validation Failed:\n");
 
     result.error.issues.forEach((issue) => {
-      console.error(`- ${issue.message}`);
+      console.error(`- ${issue.path.join('.')}: ${issue.message}`);
     });
 
     console.error("\n🛑 Server startup aborted.\n");
