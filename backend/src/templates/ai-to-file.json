@@ -1,0 +1,33 @@
+{
+  "id": "ai-to-file",
+  "name": "AI Write To File",
+  "description": "Generate AI content and save it to a file.",
+  "category": "AI Writing",
+  "icon": "📝",
+  "tags": ["ai", "file", "automation"],
+  "steps": [
+    {
+      "stepId": "generate",
+      "name": "Generate Content",
+      "type": "llm",
+      "prompt": "Write detailed content about: {{input.topic}}",
+      "useMemory": false,
+      "memoryTopK": 5
+    },
+    {
+      "stepId": "save",
+      "name": "Save Content To File",
+      "type": "file",
+      "action": "write",
+      "path": "runtime/content.txt",
+      "content": "{{last.output}}"
+    }
+  ],
+  "edges": [
+    {
+      "id": "generate-to-save",
+      "source": "generate",
+      "target": "save"
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "id": "file-logger",
+  "name": "File Logger",
+  "description": "Append messages to a log file.",
+  "category": "Automation",
+  "icon": "📂",
+  "tags": ["file", "logging"],
+  "steps": [
+    {
+      "name": "Write Log Entry",
+      "type": "file",
+      "action": "append",
+      "path": "runtime/log.txt",
+      "content": "Log Entry at {{timestamp}} : {{input.message}}"
+    }
+  ]
+}

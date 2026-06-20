@@ -1,0 +1,117 @@
+{
+  "id": "switch-test",
+  "name": "Switch Test",
+  "description": "Tests switch-case.",
+  "category": "Custom",
+  "icon": "⚙️",
+  "tags": [
+    "workflow"
+  ],
+  "steps": [
+    {
+      "stepId": "generate",
+      "name": "Generate Type",
+      "position": {
+        "x": 340,
+        "y": -380
+      },
+      "type": "llm",
+      "prompt": "choose any random word and Respond with one word: email, file, browser or fallback",
+      "useMemory": false,
+      "memoryTopK": 5
+    },
+    {
+      "stepId": "route",
+      "name": "Route",
+      "position": {
+        "x": 340,
+        "y": -200
+      },
+      "type": "switch"
+    },
+    {
+      "stepId": "email",
+      "name": "Email Step",
+      "position": {
+        "x": 60,
+        "y": 60
+      },
+      "type": "email",
+      "to": "thisismail@test.com",
+      "subject": "Switch Case",
+      "text": "Working fine",
+      "html": ""
+    },
+    {
+      "stepId": "file",
+      "name": "File Step",
+      "position": {
+        "x": 220,
+        "y": 220
+      },
+      "type": "file",
+      "action": "write",
+      "path": "runtime/working.txt",
+      "content": "Switch Case working"
+    },
+    {
+      "stepId": "browser",
+      "name": "Browser",
+      "position": {
+        "x": 640,
+        "y": 60
+      },
+      "type": "browser",
+      "action": "screenshot",
+      "url": "https://google.com",
+      "code": ""
+    },
+    {
+      "stepId": "fallback",
+      "name": "Fallback",
+      "position": {
+        "x": 480,
+        "y": 220
+      },
+      "type": "file",
+      "action": "write",
+      "path": "runtime/fallback.txt",
+      "content": "This is fallback"
+    }
+  ],
+  "edges": [
+    {
+      "id": "generate-to-route",
+      "source": "generate",
+      "target": "route"
+    },
+    {
+      "id": "route-to-email",
+      "source": "route",
+      "target": "email",
+      "caseValue": "email",
+      "label": "email"
+    },
+    {
+      "id": "route-to-file",
+      "source": "route",
+      "target": "file",
+      "caseValue": "file",
+      "label": "file"
+    },
+    {
+      "id": "route-to-browser",
+      "source": "route",
+      "target": "browser",
+      "caseValue": "browser",
+      "label": "browser"
+    },
+    {
+      "id": "route-to-fallback",
+      "source": "route",
+      "target": "fallback",
+      "caseValue": "default",
+      "label": "default"
+    }
+  ]
+}

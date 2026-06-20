@@ -1,0 +1,17 @@
+{
+  "id": "send-email",
+  "name": "Send Email",
+  "description": "Send an automated email message.",
+  "category": "Communication",
+  "icon": "📧",
+  "tags": ["email", "automation"],
+  "steps": [
+    {
+      "name": "Send Email",
+      "type": "email",
+      "to": "test@gmail.com",
+      "subject": "Testing Subject",
+      "text": "This is Ai Agent Automation testing email."
+    }
+  ]
+}

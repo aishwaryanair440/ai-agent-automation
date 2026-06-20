@@ -1,0 +1,16 @@
+{
+  "id": "website-screenshot",
+  "name": "Website Screenshot",
+  "description": "Capture a screenshot of a website automatically.",
+  "category": "Automation",
+  "icon": "📸",
+  "tags": ["browser", "screenshot", "automation"],
+  "steps": [
+    {
+      "name": "Capture Website Screenshot",
+      "type": "browser",
+      "action": "screenshot",
+      "url": "https://vmdeshpande.github.io/ai-automation-platform-website/"
+    }
+  ]
+}
